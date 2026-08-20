@@ -39,6 +39,7 @@ ALLOWED_HOSTS = [
     "jazz-chatbot.vercel.app",
     "localhost",
     "127.0.0.1",
+    "jazzchatbotv21-38z45lp9l-rehan-aa59.vercel.app"
 ]
 # --- WhatsApp Cloud API settings (from Meta App Dashboard) ---
 WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
