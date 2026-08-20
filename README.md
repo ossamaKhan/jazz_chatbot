@@ -83,7 +83,89 @@ to test rephrasings specific to your actual FAQ content as it grows.
 
 ---
 
-# WhatsApp setup (optional)
+# Deploying on Vercel
+
+Vercel now has zero-config Django support - it auto-detects `manage.py`,
+runs `collectstatic`, and serves static files from its CDN with no
+`vercel.json` needed. But two things about *this specific project* need
+a workaround, both already built in:
+
+**1. SQLite persistence.** Vercel's filesystem is read-only except for
+`/tmp` (writable, up to 500MB, but wiped on every cold start). This repo
+ships with a **pre-loaded `db.sqlite3`** (already containing your 63 Q&A
+pairs) committed alongside the code. `faqbot/settings.py` detects the
+`VERCEL` environment variable (set automatically by the platform) and
+copies that bundled database into `/tmp/db.sqlite3` once per cold start.
+
+**Real limitation to know about:** any writes made while the app is
+running - specifically, `IncomingMessageLog` entries (the record of who
+asked what) - do NOT persist across cold starts. Only the bundled
+Q&A data is guaranteed to survive. If you need a durable message log,
+that needs a real hosted database (Postgres) instead of this SQLite
+workaround - ask if you want that swapped in later.
+
+**Updating the FAQ content later:** you can't just run `load_qa` against
+the live Vercel site (its filesystem is read-only). Instead, regenerate
+`db.sqlite3` locally and redeploy:
+```bash
+rm db.sqlite3
+python manage.py migrate
+python manage.py load_qa YourUpdatedFAQ.docx --replace
+# commit the new db.sqlite3, then redeploy (see below)
+```
+
+**2. The semantic matching layer is a large dependency.** `sentence-transformers`
++ PyTorch may push you close to or over Vercel's Python bundle size limit
+(500MB uncompressed as of this writing). If your deployment fails with a
+bundle-size error, remove this line from `requirements.txt`:
+```
+sentence-transformers>=3.0.0
+```
+and redeploy. The app is built to fail gracefully - it'll automatically
+fall back to the TF-IDF/fuzzy matching layer with no code changes needed
+(see `bot/semantic_matching.py`).
+
+### Deploy steps
+
+1. Install the Vercel CLI (needs Node.js installed first):
+   ```bash
+   npm install -g vercel
+   ```
+2. From the project folder, log in and deploy:
+   ```bash
+   cd faq_chatbot
+   vercel login
+   vercel
+   ```
+   Follow the prompts (link to a new project, accept defaults). This
+   deploys a preview; confirm it works before going to production.
+3. Set environment variables - either via the prompts, or in the
+   [Vercel dashboard](https://vercel.com/dashboard) under your project's
+   **Settings > Environment Variables**:
+   - `DJANGO_SECRET_KEY` - a long random string
+   - `DJANGO_DEBUG` - `False`
+   - `DJANGO_ALLOWED_HOSTS` - `.vercel.app` (or your custom domain once added)
+4. Deploy to production:
+   ```bash
+   vercel --prod
+   ```
+5. Visit the URL Vercel gives you (`https://your-project.vercel.app`) -
+   the chat widget should load at `/` with your FAQ data already in place.
+
+### If something goes wrong
+
+- **Build fails with a bundle-size error** → see the `sentence-transformers`
+  note above.
+- **500 error on first request** → check `DJANGO_ALLOWED_HOSTS` includes
+  your actual Vercel domain, and `DJANGO_SECRET_KEY` is set.
+- **Admin panel styling looks broken** → confirm `whitenoise` installed
+  correctly and `STATIC_ROOT` wasn't removed from `faqbot/settings.py`.
+- **Q&A data missing** → confirm `db.sqlite3` was actually committed to
+  your repo/deployment (check it's not excluded by a `.gitignore`).
+
+---
+
+
 
 Uses Meta's official WhatsApp Cloud API directly (no third-party BSP
 needed). Replies to customer-initiated messages are free under Meta's

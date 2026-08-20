@@ -35,11 +35,8 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = [
-    "jazz-chatbot.vercel.app",
-    "localhost",
-    "127.0.0.1",
-]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '.vercel.app,localhost,127.0.0.1').split(',') if h.strip()]
+
 # --- WhatsApp Cloud API settings (from Meta App Dashboard) ---
 WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
@@ -95,41 +92,54 @@ WSGI_APPLICATION = 'faqbot.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 import shutil
+import logging
 
-# On Vercel, the deployment filesystem is READ-ONLY except for /tmp (up to
-# 500MB, wiped on every cold start). SQLite needs a writable file, so:
-# - Locally / on a normal host: use db.sqlite3 next to manage.py, as usual.
-# - On Vercel (VERCEL env var is set automatically by the platform): copy
-#   the bundled, pre-loaded db.sqlite3 into /tmp once per cold start, then
-#   point Django at that writable copy. Any writes (e.g. IncomingMessageLog
-#   entries) will NOT persist across cold starts - only QAPair data baked
-#   into the bundled db.sqlite3 at deploy time is guaranteed to be there.
+_db_logger = logging.getLogger('faqbot.db_setup')
+
 # On a read-only deployment filesystem (e.g. Vercel), SQLite needs a
-# writable file. Rather than trust a specific platform's env var name,
-# PROBE for actual writability - more portable, and avoids a real bug
-# hit in testing: shutil.copy() preserves the SOURCE file's permission
-# bits, so naively copying a read-only-bundled db.sqlite3 into /tmp
-# produced a copy that was STILL read-only despite /tmp itself being
-# writable. Fixed by explicitly chmod'ing the copy afterward.
+# writable file. PROBING for actual writability (rather than trusting a
+# platform-specific env var name) is more portable, but has a subtlety:
+# a directory can allow creating NEW files while a specific EXISTING file
+# in it (like our committed db.sqlite3) still carries its own read-only
+# permission bits from how the platform packaged it. So we check the
+# actual candidate file's writability directly, not just the directory's.
+#
+# Also fixed: shutil.copy() preserves the SOURCE file's permission bits,
+# so copying a read-only-bundled db.sqlite3 into /tmp produced a copy
+# that was STILL read-only despite /tmp itself being writable - fixed by
+# explicitly chmod'ing the copy afterward.
 def _resolve_writable_db_path():
     candidate = BASE_DIR / 'db.sqlite3'
-    try:
-        probe = BASE_DIR / '.write_test'
-        probe.touch()
-        probe.unlink()
-        return candidate  # BASE_DIR is writable - normal local/non-serverless case
-    except OSError:
-        pass
 
-    # BASE_DIR isn't writable - fall back to /tmp (writable scratch space
-    # on Vercel and similar platforms), copying the bundled DB there once.
+    if candidate.exists():
+        try:
+            with open(candidate, 'r+b'):
+                pass
+            _db_logger.warning('DB SETUP: using existing writable file at %s', candidate)
+            return candidate
+        except OSError as exc:
+            _db_logger.warning('DB SETUP: %s exists but open(r+b) failed (%s) - falling back to /tmp', candidate, exc)
+    else:
+        try:
+            probe = BASE_DIR / '.write_test'
+            probe.touch()
+            probe.unlink()
+            _db_logger.warning('DB SETUP: no existing db.sqlite3, but %s is writable - will create it there', BASE_DIR)
+            return candidate
+        except OSError as exc:
+            _db_logger.warning('DB SETUP: %s is not writable (%s) - falling back to /tmp', BASE_DIR, exc)
+
+    # Fall back to /tmp (writable scratch space on Vercel and similar platforms).
     runtime_db = Path('/tmp/db.sqlite3')
     if not runtime_db.exists():
         if candidate.exists():
             shutil.copy(candidate, runtime_db)
+            _db_logger.warning('DB SETUP: copied %s -> %s', candidate, runtime_db)
         else:
             runtime_db.touch()
+            _db_logger.warning('DB SETUP: created empty new db at %s', runtime_db)
     os.chmod(runtime_db, 0o666)  # force-writable regardless of source permissions
+    _db_logger.warning('DB SETUP: final path in use: %s (writable=%s)', runtime_db, os.access(runtime_db, os.W_OK))
     return runtime_db
 
 

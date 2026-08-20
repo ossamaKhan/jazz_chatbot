@@ -51,7 +51,7 @@ from . import semantic_matching
 
 MATCH_THRESHOLD = 38            # 0-100, used when semantic matching is unavailable (word-overlap only)
 SEMANTIC_MATCH_THRESHOLD = 45   # 0-100, used when semantic matching is available (blended score) - TUNE THIS, see note above
-AMBIGUITY_MARGIN = 2            # 0-100. If top two scores differ by less than this, it's a toss-up.
+AMBIGUITY_MARGIN = 3            # 0-100. If top two scores differ by less than this, it's a toss-up.
 TFIDF_WEIGHT = 0.65             # blend weight for TF-IDF vs token_set_ratio, within the word-overlap layer
 SEMANTIC_WEIGHT = 0.75          # blend weight for semantic vs word-overlap, when semantic is available
 

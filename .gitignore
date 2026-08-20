@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+venv/
+staticfiles/
+*.log
+
+# IMPORTANT: db.sqlite3 is intentionally NOT ignored here.
+# This project bundles a pre-loaded db.sqlite3 as part of the deployment
+# for Vercel (see README.md "Deploying on Vercel" section) - Vercel's
+# filesystem is otherwise read-only, so this committed database is how
+# the FAQ data gets onto the deployed site at all. Don't add db.sqlite3
+# to this file unless you've switched to a hosted database instead.
