@@ -75,7 +75,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    padding: 16px 28px;
+    padding: 12px 28px;
     border-bottom: 1px solid var(--border);
     background: linear-gradient(180deg, rgba(127,127,127,0.04), transparent);
     flex-shrink: 0;
@@ -91,13 +91,15 @@
   .header-right {
     display: flex;
     align-items: center;
+    gap: 12px;
     flex-shrink: 0;
   }
 
   .jazz-logo {
-    height: 100px;
+    height: 40px;
     width: auto;
     display: block;
+    object-fit: contain;
   }
 
   .theme-toggle {
@@ -191,8 +193,8 @@
   }
 
   .row.user .bubble {
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: rgb(200, 22, 31);
+    color: #FFFFFF;
     font-weight: 500;
     border-bottom-right-radius: 4px;
   }
@@ -313,7 +315,7 @@
     text-align: center;
     padding: 10px 16px 14px;
     font-size: 11px;
-    color: var(--text-muted);
+    color: rgb(200, 22, 31);
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: 0.02em;
     background: var(--panel);
@@ -326,7 +328,7 @@
 
   @media (max-width: 640px) {
     .header { padding: 14px 16px; }
-    .jazz-logo { height: 34px; }
+    .jazz-logo { height: 32px; }
     .header-text h1 { font-size: 16px; }
   }
 </style>
@@ -344,12 +346,12 @@
         <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
       </div>
       <div class="header-text">
-        <h1>SmartAssist</h1>
+        <h1>Central B · SmartAssist</h1>
       </div>
     </div>
     <div class="header-right">
-      <img src="{% static 'images/JW.png' %}" alt="Logo" class="jazz-logo">
-      <img src="{% static 'images/Jw.jpeg' %}" alt="Logo" class="jazz-logo">
+      <img src="{% static 'images/JW.png' %}" alt="JazzWorld Logo" class="jazz-logo">
+      <img src="{% static 'images/Jw_2.png' %}" alt="Jazz Logo" class="jazz-logo">
     </div>
   </div>
 
@@ -364,11 +366,11 @@
     </form>
   </div>
 
-  <div class="footer"><b>Developed by Central B Operations Team</div></div>
+  <div class="footer"><b>Developed by Central B Operations Team</b></div>
 </div>
 
 <script>
-  // ---- Theme handling ---->
+  // ---- Theme handling ----
   (function initTheme() {
     const stored = localStorage.getItem('faqbot-theme');
     const preferred = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
