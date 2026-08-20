@@ -35,11 +35,8 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = [
-    ".vercel.app",
-    "localhost",
-    "127.0.0.1",
-]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
+
 # --- WhatsApp Cloud API settings (from Meta App Dashboard) ---
 WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
@@ -62,6 +59,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -93,10 +91,51 @@ WSGI_APPLICATION = 'faqbot.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+import shutil
+
+# On Vercel, the deployment filesystem is READ-ONLY except for /tmp (up to
+# 500MB, wiped on every cold start). SQLite needs a writable file, so:
+# - Locally / on a normal host: use db.sqlite3 next to manage.py, as usual.
+# - On Vercel (VERCEL env var is set automatically by the platform): copy
+#   the bundled, pre-loaded db.sqlite3 into /tmp once per cold start, then
+#   point Django at that writable copy. Any writes (e.g. IncomingMessageLog
+#   entries) will NOT persist across cold starts - only QAPair data baked
+#   into the bundled db.sqlite3 at deploy time is guaranteed to be there.
+# On a read-only deployment filesystem (e.g. Vercel), SQLite needs a
+# writable file. Rather than trust a specific platform's env var name,
+# PROBE for actual writability - more portable, and avoids a real bug
+# hit in testing: shutil.copy() preserves the SOURCE file's permission
+# bits, so naively copying a read-only-bundled db.sqlite3 into /tmp
+# produced a copy that was STILL read-only despite /tmp itself being
+# writable. Fixed by explicitly chmod'ing the copy afterward.
+def _resolve_writable_db_path():
+    candidate = BASE_DIR / 'db.sqlite3'
+    try:
+        probe = BASE_DIR / '.write_test'
+        probe.touch()
+        probe.unlink()
+        return candidate  # BASE_DIR is writable - normal local/non-serverless case
+    except OSError:
+        pass
+
+    # BASE_DIR isn't writable - fall back to /tmp (writable scratch space
+    # on Vercel and similar platforms), copying the bundled DB there once.
+    runtime_db = Path('/tmp/db.sqlite3')
+    if not runtime_db.exists():
+        if candidate.exists():
+            shutil.copy(candidate, runtime_db)
+        else:
+            runtime_db.touch()
+    os.chmod(runtime_db, 0o666)  # force-writable regardless of source permissions
+    return runtime_db
+
+
+_db_path = _resolve_writable_db_path()
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': _db_path,
     }
 }
 
@@ -136,6 +175,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # Email
