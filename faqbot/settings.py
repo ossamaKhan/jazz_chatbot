@@ -35,12 +35,8 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = [
-    "jazz-chatbot.vercel.app",
-    "localhost",
-    "127.0.0.1",
-    "jazzchatbotv21-38z45lp9l-rehan-aa59.vercel.app"
-]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '.vercel.app,localhost,127.0.0.1,testserver').split(',') if h.strip()]
+
 # --- WhatsApp Cloud API settings (from Meta App Dashboard) ---
 WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
@@ -193,6 +189,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Picks up your top-level static/ folder (e.g. static/images/JW.png) -
+# without this, Django only looks inside each app's own static/ subfolder.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

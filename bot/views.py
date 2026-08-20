@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .matching import resolve_match
 from .models import IncomingMessageLog, QAPair
+from .smalltalk import GREETING_REPLY, is_greeting
 from .whatsapp import send_whatsapp_text
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,26 @@ def ask(request):
         return JsonResponse({"error": "message is required"}, status=400)
 
     qa_pairs = QAPair.objects.all()
+
+    if is_greeting(user_text):
+        IncomingMessageLog.objects.create(
+            from_number="web",
+            message_text=user_text,
+            matched_question=None,
+            match_score=None,
+            answered=True,
+        )
+        return JsonResponse(
+            {
+                "answer": GREETING_REPLY,
+                "matched": False,
+                "score": None,
+                "matched_question": None,
+                "ambiguous": False,
+                "greeting": True,
+            }
+        )
+
     outcome = resolve_match(user_text, qa_pairs)
 
     if outcome.match:
@@ -87,6 +108,7 @@ def ask(request):
             "score": score,
             "matched_question": matched_question,
             "ambiguous": ambiguous,
+            "greeting": False,
         }
     )
 
@@ -146,6 +168,18 @@ def _process_message(message: dict):
         return
 
     qa_pairs = QAPair.objects.all()
+
+    if is_greeting(user_text):
+        send_whatsapp_text(from_number, GREETING_REPLY)
+        IncomingMessageLog.objects.create(
+            from_number=from_number,
+            message_text=user_text,
+            matched_question=None,
+            match_score=None,
+            answered=True,
+        )
+        return
+
     outcome = resolve_match(user_text, qa_pairs)
 
     if outcome.match:
