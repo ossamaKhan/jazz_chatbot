@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 .env
 venv/
-staticfiles/
 *.log
 
 # IMPORTANT: db.sqlite3 is intentionally NOT ignored here.
